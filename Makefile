@@ -1,15 +1,27 @@
-src_dir = src
-build_dir = build
-src_files = main.c process.c
+CC = gcc
+CFLAGS = -Wall -Wextra -Werror -g -std=c11
 
-run: $(build_dir)/main
-	./$(build_dir)/main
+SRC_DIR = src
+BUILD_DIR = build
+TARGET = $(BUILD_DIR)/sv
 
-$(build_dir)/main: $(build_dir)/main.o
-	cc $(src_dir)/main.c -o $(build_dir)/main
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
-$(build_dir)/main.o: $(src_dir)/main.c
-	cc -c $(src_dir)/main.c -o $(build_dir)/main.o
+all = $(TARGET)
 
-$(src_dir)/main.c:
-	echo "ciao"
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+.PHONY: all run clean
+
