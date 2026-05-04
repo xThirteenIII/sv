@@ -4,5 +4,6 @@
 #include <sys/types.h>
 
 pid_t Fork(void);
+int run_service(char *cmdline);
 
 #endif
