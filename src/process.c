@@ -3,15 +3,16 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <signal.h>
 #include <string.h>
 #include "utility.h"
 
 #define MAXARGS 32
 
-pid_t Fork(void) {
+pid_t Fork(void)
+{
     pid_t pid;
 
     if ((pid = fork()) < 0)
@@ -19,7 +20,8 @@ pid_t Fork(void) {
     return pid;
 }
 
-void run_service(char *cmdline) {
+void run_service(char *cmdline)
+{
     char *buf = malloc(sizeof(char) * strlen(cmdline) + 2); // +1 for '\n'
                                                             // +1 for '\0'
     char **argv = malloc(sizeof(char*) * MAXARGS); // allocate MAX space, to avoid bad stuff happening.
