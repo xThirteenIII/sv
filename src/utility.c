@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "service.h"
 
 #define MAX_LINE 128
 
@@ -31,22 +32,39 @@ int parseline(char *buf, char **argv) {
     return 0;
 }
 
-void read_conf_file(const char *fname)
+service_t *read_conf_file(const char *fname)
 {
+    service_t *service = calloc(1, sizeof(service_t));
     FILE *fp = fopen(fname, "r");
     if (!fp){
         fprintf(stderr, "Can't open file %s: %s\n", fname, strerror(errno));
         exit(EXIT_FAILURE);
     }
+    /* Read line by line */
     while(!feof(fp)){
         char *line = calloc(MAX_LINE, sizeof(char));
         fgets(line, MAX_LINE, fp);
+        /* Extract key:value pairs */
+        entry_t entry = read_entry(line);
         free(line);
+        /* Skip comments */
         if (ferror(fp) < 0)
             exit(EXIT_FAILURE);
+        if (strcmp(entry.key, "cmd") == 0){
+            service->cmdline=entry.value;
+        }
+        else if (strcmp(entry.key, "restart") == 0)
+            service->restart = entry.value;
+        else if (strcmp(entry.key, "stdout") == 0)
+            service->fout=entry.value;
+        else if (strcmp(entry.key, "stderr") == 0)
+            service->ferr=entry.value;
+        else
+            continue;
     }
-    printf("\n");
+    printf("k: %s\tv: %s\n", service->cmdline, service->ferr);
     fclose(fp);
+    return service;
 }
 
 void unix_error(char *msg) {
