@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define MAX_LINE 128
+
 int parseline(char *buf, char **argv) {
     char *delim;
     int argc;
@@ -36,16 +38,14 @@ void read_conf_file(const char *fname)
         fprintf(stderr, "Can't open file %s: %s\n", fname, strerror(errno));
         exit(EXIT_FAILURE);
     }
-    char *c = malloc(sizeof(char));
-    size_t line_len = 0;
-    printf("File stream @ %p\n", fp);
-    while (*c != '\n') {
-        size_t bytes_read = fread(&c, sizeof(char), 1, fp);
-        strn
-        line_len++;
+    while(!feof(fp)){
+        char *line = calloc(MAX_LINE, sizeof(char));
+        fgets(line, MAX_LINE, fp);
+        free(line);
+        if (ferror(fp) < 0)
+            exit(EXIT_FAILURE);
     }
-    //TODO: use feof and ferror to check if EOF or error returned
-    free(line);
+    printf("\n");
     fclose(fp);
 }
 
