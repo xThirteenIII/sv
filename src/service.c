@@ -3,26 +3,18 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include "service.h"
-#include "utility.h"
-#include "process.h"
 
-#define MAXARGS 32
+#define MAX_LINE 128
 
-int service_load(service_t *service, const char *path)
-{
-    *service = read_conf_file(path);
-    return 0;
-}
+typedef struct Entry {
+    char key[MAX_CHARS];
+    char value[MAX_CHARS];
+}entry_t;
 
-void service_shutdown(service_t *service)
-{
-}
-
-entry_t read_entry(char *line)
+static entry_t read_entry(char *line)
 {
     struct Entry entry = {
         .key = "",
@@ -49,48 +41,88 @@ entry_t read_entry(char *line)
     return entry;
 }
 
-void service_run(char *cmdline)
+int service_load(service_t *service, const char *path)
 {
-    char *buf = malloc(sizeof(char) * strlen(cmdline));
-    char **argv = malloc(sizeof(char*) * MAXARGS); // allocate MAX space, to avoid bad stuff happening.
-                                                   // No need to optimize for now
-    strcpy(buf, cmdline);
-    // cmdline read from config file has already trailing \n
-    buf[strlen(buf)] = '\0'; 
-    parseline(buf, argv);
-
-    pid_t pid;
-    int statuspd;
-
-    // Ctrl+C kills both parent and child, thus I can't see if the child is being killed or not.
-    // For testing, let's ignore the SIGINT in the parent, and put DEFAULT behaviour in the child.
-    // This works.
-    signal(SIGINT, SIG_IGN);
-    pid = Fork();
-    
-    if (pid == 0) {
-        printf("child executing: %s\n", argv[0]);
-        signal(SIGINT, SIG_DFL);
-        execv(argv[0], argv);  // execv over execve because we don't care about environ for now
-        unix_error("execve error\n"); // exit(EXIT_FAILURE) if execve returns 
+    FILE *fp = fopen(path, "r");
+    if (!fp){
+        fprintf(stderr, "Can't open file %s: %s\n", path, strerror(errno));
+        exit(EXIT_FAILURE);
     }
+    /* Read line by line */
+    char line[MAX_LINE];
 
-    pid_t child = waitpid(-1, &statuspd ,0);
+    // checking if fgets returns NULL is better than !feof(fp)
+    // because fgets stops exactly when it encounters EOF (or error), while feof returns after having read EOF
+    // and does one more iteration
+    while(fgets(line, MAX_LINE, fp) != NULL){
+        /* Extract key:value pairs */
+        entry_t entry = read_entry(line);
+        /* Skip comments */
+        if (ferror(fp) < 0)
+            return -1;
+        if (strcmp(entry.key, "cmd") == 0){
+            // strcpy copies null terminator, but doesn't check for buffer overflow
+            // We use strnprintf that handles it automatically
+            snprintf(service->cmdline, sizeof(service->cmdline), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "restart") == 0){
+            snprintf(service->restart, sizeof(service->restart), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "stdout") == 0){
+            snprintf(service->fout, sizeof(service->fout), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "stderr") == 0){
+            snprintf(service->ferr, sizeof(service->ferr), "%s", entry.value);
+        }
+        else
+            continue;
+    }
+    fclose(fp);
+    return 0;
+}
 
-    int err = errno; // It is adviced to copy errno as soon as syscall ends.
-    printf("waitpid returned %d, status=%d, errno=%d\n", child, statuspd, err);
+void service_shutdown(service_t *service)
+{
+}
 
-    if (child < 0)
-        unix_error("waitpid err\n");
-    else if (WIFEXITED(statuspd) && child > 0)
-        printf("child %d terminated normally with exit status: %d\n", child, WEXITSTATUS(statuspd));
-    else if (WIFSIGNALED(statuspd))
-        printf("child %d terminated by signal %d\n", child, WTERMSIG(statuspd));
-    else
-        printf("child %d terminated abnormally\n", child);
 
-    printf("Parent terminated child with PID: %d\n", child);
+service_t read_conf_file(const char *fname)
+{
+    service_t service;
+    FILE *fp = fopen(fname, "r");
+    if (!fp){
+        fprintf(stderr, "Can't open file %s: %s\n", fname, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    /* Read line by line */
+    char line[MAX_LINE];
 
-    free(buf);
-    free(argv);
+    // checking if fgets returns NULL is better than !feof(fp)
+    // because fgets stops exactly when it encounters EOF (or error), while feof returns after having read EOF
+    // and does one more iteration
+    while(fgets(line, MAX_LINE, fp) != NULL){
+        /* Extract key:value pairs */
+        entry_t entry = read_entry(line);
+        /* Skip comments */
+        if (ferror(fp) < 0)
+            exit(EXIT_FAILURE);
+        if (strcmp(entry.key, "cmd") == 0){
+            // strcpy copies null terminator, but doesn't check for buffer overflow
+            // We use strnprintf that handles it automatically
+            snprintf(service.cmdline, sizeof(service.cmdline), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "restart") == 0){
+            snprintf(service.restart, sizeof(service.restart), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "stdout") == 0){
+            snprintf(service.fout, sizeof(service.fout), "%s", entry.value);
+        }
+        else if (strcmp(entry.key, "stderr") == 0){
+            snprintf(service.ferr, sizeof(service.ferr), "%s", entry.value);
+        }
+        else
+            continue;
+    }
+    fclose(fp);
+    return service;
 }
