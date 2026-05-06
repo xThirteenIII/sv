@@ -32,9 +32,9 @@ int parseline(char *buf, char **argv) {
     return 0;
 }
 
-service_t *read_conf_file(const char *fname)
+service_t read_conf_file(const char *fname)
 {
-    service_t *service = calloc(1, sizeof(service_t));
+    service_t service;
     FILE *fp = fopen(fname, "r");
     if (!fp){
         fprintf(stderr, "Can't open file %s: %s\n", fname, strerror(errno));
@@ -51,18 +51,24 @@ service_t *read_conf_file(const char *fname)
         if (ferror(fp) < 0)
             exit(EXIT_FAILURE);
         if (strcmp(entry.key, "cmd") == 0){
-            service->cmdline=entry.value;
+            strcpy(service.cmdline, entry.value);
+            service.cmdline[strlen(entry.value)] = '\0';
         }
-        else if (strcmp(entry.key, "restart") == 0)
-            service->restart = entry.value;
-        else if (strcmp(entry.key, "stdout") == 0)
-            service->fout=entry.value;
-        else if (strcmp(entry.key, "stderr") == 0)
-            service->ferr=entry.value;
+        else if (strcmp(entry.key, "restart") == 0){
+            strcpy(service.restart, entry.value);
+            service.restart[strlen(entry.value)] = '\0';
+        }
+        else if (strcmp(entry.key, "stdout") == 0){
+            strcpy(service.fout, entry.value);
+            service.fout[strlen(entry.value)] = '\0';
+        }
+        else if (strcmp(entry.key, "stderr") == 0){
+            strcpy(service.ferr, entry.value);
+            service.ferr[strlen(entry.value)] = '\0';
+        }
         else
             continue;
     }
-    printf("k: %s\tv: %s\n", service->cmdline, service->ferr);
     fclose(fp);
     return service;
 }
