@@ -64,15 +64,25 @@ int service_load(service_t *service, const char *path)
             // strcpy copies null terminator, but doesn't check for buffer overflow
             // We use strnprintf that handles it automatically
             snprintf(service->cmdline, sizeof(service->cmdline), "%s", entry.value);
+            // We don't check for traling '\n' because parseline function already takes care of that.
         }
         else if (strcmp(entry.key, "restart") == 0){
             snprintf(service->restart, sizeof(service->restart), "%s", entry.value);
+            char *delim;
+            if ((delim = strchr(service->restart, '\n')))
+                *delim = '\0';
         }
         else if (strcmp(entry.key, "stdout") == 0){
             snprintf(service->fout, sizeof(service->fout), "%s", entry.value);
+            char *delim;
+            if ((delim = strchr(service->fout, '\n')))
+                *delim = '\0';
         }
         else if (strcmp(entry.key, "stderr") == 0){
             snprintf(service->ferr, sizeof(service->ferr), "%s", entry.value);
+            char *delim;
+            if ((delim = strchr(service->ferr, '\n')))
+                *delim = '\0';
         }
         else
             continue;
@@ -83,46 +93,4 @@ int service_load(service_t *service, const char *path)
 
 void service_shutdown(service_t *service)
 {
-}
-
-
-service_t read_conf_file(const char *fname)
-{
-    service_t service;
-    FILE *fp = fopen(fname, "r");
-    if (!fp){
-        fprintf(stderr, "Can't open file %s: %s\n", fname, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    /* Read line by line */
-    char line[MAX_LINE];
-
-    // checking if fgets returns NULL is better than !feof(fp)
-    // because fgets stops exactly when it encounters EOF (or error), while feof returns after having read EOF
-    // and does one more iteration
-    while(fgets(line, MAX_LINE, fp) != NULL){
-        /* Extract key:value pairs */
-        entry_t entry = read_entry(line);
-        /* Skip comments */
-        if (ferror(fp) < 0)
-            exit(EXIT_FAILURE);
-        if (strcmp(entry.key, "cmd") == 0){
-            // strcpy copies null terminator, but doesn't check for buffer overflow
-            // We use strnprintf that handles it automatically
-            snprintf(service.cmdline, sizeof(service.cmdline), "%s", entry.value);
-        }
-        else if (strcmp(entry.key, "restart") == 0){
-            snprintf(service.restart, sizeof(service.restart), "%s", entry.value);
-        }
-        else if (strcmp(entry.key, "stdout") == 0){
-            snprintf(service.fout, sizeof(service.fout), "%s", entry.value);
-        }
-        else if (strcmp(entry.key, "stderr") == 0){
-            snprintf(service.ferr, sizeof(service.ferr), "%s", entry.value);
-        }
-        else
-            continue;
-    }
-    fclose(fp);
-    return service;
 }

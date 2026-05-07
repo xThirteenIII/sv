@@ -10,6 +10,6 @@ int main()
     int ok = service_load(&service, "services/sleep.conf");
     if (ok < 0)
         return -1;
-    run_service(service.cmdline);
+    run_service(&service);
     return 0;
 }
