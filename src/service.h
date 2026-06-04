@@ -13,5 +13,4 @@ typedef struct Service {
 int service_load(service_t *service, const char *fname);
 void service_shutdown(service_t *service);
 
-
 #endif

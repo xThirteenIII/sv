@@ -11,7 +11,7 @@
 #include "service.h"
 #include "utility.h"
 
-#define MAXARGS 64
+#define MAXARGS 256
 
 pid_t Fork(void)
 {
@@ -41,44 +41,32 @@ static int ensure_parent_dir(const char *path)
     return 0;
 }
 
-static void redirect_stdout(char *fname){
-        ensure_parent_dir(fname);
-        /*
-         * O_APPEND may lead to corrupted files on NFS
-         * filesystems if more than one process appends data
-         * to a file at once.  This is because NFS does not
-         * support appending to a file, so the client kernel
-         * has to simulate it, which can't be done without a
-         * race condition.
-         */
-        int fdout = open(fname, O_CREAT | O_RDWR | O_APPEND, 0777);
-        if (fdout < 0){
-            int err = errno; // It is adviced to copy errno as soon as syscall ends.
-            printf("dup2 failed with errno: %s", strerror(err));
-            exit(EXIT_FAILURE);
-        }
-        if (dup2(fdout, STDOUT_FILENO) < 0) {
-            int err = errno; // It is adviced to copy errno as soon as syscall ends.
-            printf("dup2 failed with errno: %s", strerror(err));
-            exit(EXIT_FAILURE);
-        }
+static void redirect_to_file(char *fname, int fd)
+{
+    ensure_parent_dir(fname);
+    /*
+     * O_APPEND may lead to corrupted files on NFS
+     * filesystems if more than one process appends data
+     * to a file at once.  This is because NFS does not
+     * support appending to a file, so the client kernel
+     * has to simulate it, which can't be done without a
+     * race condition.
+     */
+    int fdout = open(fname, O_CREAT | O_WRONLY | O_APPEND, 0777);
+    if (fdout < 0){
+        int err = errno; // It is adviced to copy errno as soon as syscall ends.
+        printf("opening %s failed with errno: %s", fname, strerror(err));
+        exit(EXIT_FAILURE);
+    }
+    if (dup2(fdout, fd) < 0) {
+        int err = errno; // It is adviced to copy errno as soon as syscall ends.
+        printf("dup2 failed with errno: %s", strerror(err));
+        exit(EXIT_FAILURE);
+    }
+    close(fdout);
 }
-
-static void redirect_stderr(char *fname){
-        ensure_parent_dir(fname);
-        int fdout = open(fname, O_CREAT | O_RDWR | O_APPEND, 0777);
-        if (fdout < 0){
-            int err = errno; // It is adviced to copy errno as soon as syscall ends.
-            printf("dup2 failed with errno: %s", strerror(err));
-            exit(EXIT_FAILURE);
-        }
-        if (dup2(fdout, STDERR_FILENO) < 0) {
-            int err = errno; // It is adviced to copy errno as soon as syscall ends.
-            printf("dup2 failed with errno: %s", strerror(err));
-            exit(EXIT_FAILURE);
-        }
-}
-void run_service(service_t *service)
+ 
+int run_service(service_t *service)
 {
     char *buf = malloc(sizeof(char) * strlen(service->cmdline) + 1);
     char **argv = malloc(sizeof(char*) * MAXARGS); // allocate MAX space, to avoid bad stuff happening.
@@ -98,9 +86,8 @@ void run_service(service_t *service)
 
     if (pid == 0) {
         ensure_parent_dir(service->fout);
-        redirect_stdout(service->fout);
-        redirect_stderr(service->ferr);
-        printf("child executing: %s\n", argv[0]);
+        redirect_to_file(service->fout, STDOUT_FILENO);
+        redirect_to_file(service->ferr, STDERR_FILENO);
         signal(SIGINT, SIG_DFL);
         execv(argv[0], argv);  // execv over execve because we don't care about environ for now
         unix_error("execve error\n"); // exit(EXIT_FAILURE) if execve returns 
@@ -128,4 +115,3 @@ void run_service(service_t *service)
     free(buf);
     free(argv);
 }
-

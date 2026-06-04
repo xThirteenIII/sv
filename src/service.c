@@ -25,6 +25,8 @@ static entry_t read_entry(char *line)
     char delim = '=';
     bool v = false;
     size_t j = 0;
+    // Read lines from .conf file.
+    // Go through characters until '=' is found, then save key and value.
     for (size_t i = 0; i < strlen(line); (++i, ++j)){
         if (!v){
             entry.key[j] = line[i];
@@ -55,14 +57,16 @@ int service_load(service_t *service, const char *path)
     // because fgets stops exactly when it encounters EOF (or error), while feof returns after having read EOF
     // and does one more iteration
     while(fgets(line, MAX_LINE, fp) != NULL){
+
         /* Extract key:value pairs */
         entry_t entry = read_entry(line);
+
         /* Skip comments */
         if (ferror(fp) < 0)
             return -1;
         if (strcmp(entry.key, "cmd") == 0){
             // strcpy copies null terminator, but doesn't check for buffer overflow
-            // We use strnprintf that handles it automatically
+            // We use snprintf that handles it automatically
             snprintf(service->cmdline, sizeof(service->cmdline), "%s", entry.value);
             // We don't check for traling '\n' because parseline function already takes care of that.
         }
